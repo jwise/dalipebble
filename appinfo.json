@@ -1,0 +1,16 @@
+{
+  "uuid": "374c5105-af36-420d-942c-9a58ff98576c",
+  "shortName": "xdaliclock",
+  "longName": "xdaliclock",
+  "companyName": "Joshua Wise",
+  "versionCode": 1,
+  "versionLabel": "1.0.0",
+  "watchapp": {
+    "watchface": true
+  },
+  "appKeys": {
+  },
+  "resources": {
+    "media": []
+  }
+}
