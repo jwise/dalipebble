@@ -4,7 +4,7 @@
   "longName": "xdaliclock",
   "companyName": "Joshua Wise",
   "versionCode": 1,
-  "versionLabel": "1.0.0",
+  "versionLabel": "0.1.0",
   "watchapp": {
     "watchface": true
   },
