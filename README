@@ -1,0 +1,31 @@
+Dali Clock -- a melting digital clock for Pebble.
+Ported to Pebble by Joshua Wise <joshua@joshuawise.com>.
+
+Original X11, Mac OS, PalmOS, JavaScript, ... version by Jamie Zawinski:
+  http://www.jwz.org/xdaliclock/
+
+===
+
+Copyright (c) 2013 Joshua Wise <joshua@joshuawise.com>.
+Copyright (c) 1991-2003 Jamie Zawinski <jwz@jwz.org>.
+
+Permission to use, copy, modify, distribute, and sell this software and its
+documentation for any purpose is hereby granted without fee, provided that
+the above copyright notice appear in all copies and that both that copyright
+notice and this permission notice appear in supporting documentation.  No
+representations are made about the suitability of this software for any
+purpose.  It is provided "as is" without express or implied warranty.
+
+===
+
+This program is a very simple -- and ugly -- port of Dali Clock.  Very
+little care was taken to homogenize C style, and globals are strewn about
+Halloween candy.  Any distasteful style within should be considered to be
+the work of myself, and not of Jamie!
+
+===
+
+To do:
+  * add support for 12-hour mode when rendering hours
+  * determine if it is actually my Pebble at fault, or if something in the
+    app is causing the watch to sometimes reboot
