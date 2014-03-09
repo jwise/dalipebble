@@ -13,7 +13,7 @@
 #ifndef __NUMBERS_H__
 #define __NUMBERS_H__
 
-typedef unsigned short POS;
+typedef unsigned char POS;
 
 struct raw_number {
   const unsigned char *bits;
