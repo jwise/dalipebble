@@ -2,6 +2,10 @@
 
 #include "numbers.h"
 
+// #define STYLE_DEBUG
+#define STYLE_HOURSMINUTES
+#define ANIMATION_TIME_MSEC 1000
+
 /* Globals. */
 struct scanline;
 struct frame;
@@ -15,6 +19,8 @@ struct frame *clear_frame;
 
 signed char current_digits[6];
 signed char target_digits[6];
+
+static uint32_t animtime;
 
 void _abort() {
   *(volatile int *)0;
@@ -255,6 +261,21 @@ static void frame_render(struct frame *frame, GContext *ctx, GPoint ofs) {
     }
 }
 
+static void frame_lerp(int from, int to) {
+  int y, x;
+  struct frame *fromf, *tof;
+  
+  fromf = from >= 0 ? base_frames[from] : clear_frame;
+  tof   = to   >= 0 ? base_frames[to]   : clear_frame;
+  
+#define LERP(a, b) (((a) * (65536 - animtime) + (b) * (animtime + 1)) / 65536)
+  for (y = 0; y < char_height; y++)
+    for (x = 0; x < MAX_SEGS_PER_LINE; x++) {
+      temp_frame->scanlines[y].left [x] = LERP(fromf->scanlines[y].left [x], tof->scanlines[y].left [x]);
+      temp_frame->scanlines[y].right[x] = LERP(fromf->scanlines[y].right[x], tof->scanlines[y].right[x]);
+    }
+}
+
 /**************************************************************************/
 /* PebbleOS shim. */
 
@@ -270,40 +291,25 @@ static void frame_render(struct frame *frame, GContext *ctx, GPoint ofs) {
  */
 
 static Animation *transition_anim;
-static uint32_t animtime;
-
-static void fill_temp_frame(int from, int to) {
-  int y, x;
-  struct frame *fromf, *tof;
-  
-  fromf = from >= 0 ? base_frames[from] : clear_frame;
-  tof   = to   >= 0 ? base_frames[to]   : clear_frame;
-  
-#define LERP(a, b) (((a) * (65536 - animtime) + (b) * (animtime + 1)) / 65536)
-  for (y = 0; y < char_height; y++)
-    for (x = 0; x < MAX_SEGS_PER_LINE; x++) {
-      temp_frame->scanlines[y].left [x] = LERP(fromf->scanlines[y].left [x], tof->scanlines[y].left [x]);
-      temp_frame->scanlines[y].right[x] = LERP(fromf->scanlines[y].right[x], tof->scanlines[y].right[x]);
-    }
-}
+static struct tm curtm, lasttm; /* Delay by one, so we tick over from 59 to 00. */
+int needs_animate = 1;
 
 static void update_layer(struct Layer *layer, GContext *ctx) {
-  char s[24];
-  time_t tt;
-  struct tm *tm;
+  char s[64];
   GRect bbox = layer_get_bounds(layer);
-  
-  time(&tt);
-  tm = localtime(&tt);
-  
-  snprintf(s, sizeof(s), "%02d:%02d:%02d %04x", tm->tm_hour, tm->tm_min, tm->tm_sec, (unsigned int)animtime);
+
   graphics_context_set_text_color(ctx, GColorWhite);
   graphics_context_set_stroke_color(ctx, GColorWhite);
   graphics_context_set_fill_color(ctx, GColorBlack);
   
   graphics_fill_rect(ctx,
-                     (GRect) { .origin = { 0, /*72*/0 }, .size = { bbox.size.w, bbox.size.h } },
+                     (GRect) { .origin = { 0, 0 }, .size = { bbox.size.w, bbox.size.h } },
                      0, GCornerNone);
+
+#if defined(STYLE_DEBUG)
+  int x;
+
+  snprintf(s, sizeof(s), "%02d:%02d:%02d %04x", lasttm.tm_hour, lasttm.tm_min, lasttm.tm_sec, (unsigned int)animtime);
   graphics_draw_text(ctx, s, 
                      fonts_get_system_font(FONT_KEY_GOTHIC_14),
                      (GRect) { .origin = { 0, 72 }, .size = { bbox.size.w, 20 } },
@@ -315,17 +321,67 @@ static void update_layer(struct Layer *layer, GContext *ctx) {
   int x;
   
   x = 0;
-  fill_temp_frame(current_digits[4] == -1 ? -1 : 10, 10);
+  frame_lerp(current_digits[4] == -1 ? -1 : 10, 10);
   frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = 0 });
   x += colon_width;
   
-  fill_temp_frame(current_digits[4], target_digits[4]);
+  frame_lerp(current_digits[4], target_digits[4]);
   frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = 0 });
   x += char_width;
   
-  fill_temp_frame(current_digits[5], target_digits[5]);
+  frame_lerp(current_digits[5], target_digits[5]);
   frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = 0 });
+
+#elif defined(STYLE_HOURSMINUTES)
+  int x;
   
+  /* Hours... */
+  x = (bbox.size.w - char_width * 2) / 2;
+  frame_lerp(current_digits[0], target_digits[0]);
+  frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = 0 });
+  x += char_width;
+  
+  frame_lerp(current_digits[1], target_digits[1]);
+  frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = 0 });
+  x += char_width;
+  
+  /* Minutes ... */
+  x = (bbox.size.w - char_width * 2) / 2;
+  frame_lerp(current_digits[2], target_digits[2]);
+  frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = char_height + 8 });
+  x += char_width;
+  
+  frame_lerp(current_digits[3], target_digits[3]);
+  frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = char_height + 8 });
+  x += char_width;
+  
+  snprintf(s, sizeof(s),
+           "%04d-%02d-%02d",
+           lasttm.tm_year + 1900, lasttm.tm_mon + 1, lasttm.tm_mday);
+  graphics_draw_text(ctx, s, 
+                     fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
+                     (GRect) { .origin = { 0, bbox.size.h - 18 - 1 - 14 }, .size = { bbox.size.w, 28 } },
+                     GTextOverflowModeFill,
+                     GTextAlignmentCenter,
+                     NULL
+                     );
+
+
+  snprintf(s, sizeof(s),
+           "%02d:%02d:%02d",
+           lasttm.tm_hour, lasttm.tm_min, lasttm.tm_sec);
+           
+  graphics_draw_text(ctx, s, 
+                     fonts_get_system_font(FONT_KEY_GOTHIC_14),
+                     (GRect) { .origin = { 0, bbox.size.h - 14 }, .size = { bbox.size.w, 28 } },
+                     GTextOverflowModeFill,
+                     GTextAlignmentCenter,
+                     NULL
+                     );
+  
+  
+#endif
+
 }
 
 static void handle_anim(Animation *anim, const uint32_t _animtime /* between 0 and 65536 */) {
@@ -345,13 +401,31 @@ static void handle_tick(struct tm *tm, TimeUnits units_changed) {
   for (i = 0; i < 6; i++)
     current_digits[i] = target_digits[i];
 
+  target_digits[0] = tm->tm_hour / 10;
+  target_digits[1] = tm->tm_hour % 10;
+  target_digits[2] = tm->tm_min / 10;
+  target_digits[3] = tm->tm_min % 10;
   target_digits[4] = tm->tm_sec / 10;
   target_digits[5] = tm->tm_sec % 10;
+  
+  memcpy(&lasttm, &curtm, sizeof(*tm));
+  memcpy(&curtm, tm, sizeof(*tm));
+  
+#ifdef STYLE_HOURSMINUTES
+  if (tm->tm_sec == 0 || needs_animate) {
+    animation_schedule(transition_anim);
+    needs_animate = 0;
+  } else
+    layer_mark_dirty(window_get_root_layer(window));
+#else
   animation_schedule(transition_anim);
+#endif
 }
 
 static void window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
+  time_t tt;
+  struct tm *tm;
   
   layer_set_update_proc(window_layer, update_layer);
   tick_timer_service_subscribe(SECOND_UNIT, handle_tick);
@@ -359,6 +433,12 @@ static void window_load(Window *window) {
   transition_anim = animation_create();
   animation_set_duration(transition_anim, 1000);
   animation_set_implementation(transition_anim, &anim_impl);
+  needs_animate = 1;
+  
+  time(&tt);
+  tm = localtime(&tt);
+  memcpy(&lasttm, tm, sizeof(*tm));
+  memcpy(&curtm, tm, sizeof(*tm));
   
   animtime = 0;
 }
