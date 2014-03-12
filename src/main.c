@@ -6,23 +6,26 @@
 #define STYLE_HOURSMINUTES
 #define ANIMATION_TIME_MSEC 1000
 
-/* Globals. */
-struct scanline;
-struct frame;
+/**************************************************************************/
+/* Cross-chunk globals. */
 
-POS char_height, char_width, colon_width;
-static Window *window;
+/* The namespace pollution here is pretty bad, but oh well. */
 
-struct frame *base_frames[12];
-struct frame *temp_frame;
-struct frame *clear_frame;
+/* Renamed from 'struct frame' to avoid confusion with the PebbleOS 'Frame'. */
+struct dali_frame;
 
-signed char current_digits[6];
-signed char target_digits[6];
+static POS char_height, char_width, colon_width;
+static Window *mainwin;
 
-static uint32_t animtime;
+static struct dali_frame *base_frames[12];
+static struct dali_frame *temp_frame;
+static struct dali_frame *clear_frame;
 
-void _abort() {
+static signed char current_digits[6];
+static signed char target_digits[6];
+
+/* The real 'abort()' does not work on Pebble, even though it exists. */
+static void _abort() {
   *(volatile int *)0;
 }
 
@@ -41,12 +44,12 @@ struct scanline {
   POS left[MAX_SEGS_PER_LINE], right[MAX_SEGS_PER_LINE];
 };
 
-struct frame {
+struct dali_frame {
   struct scanline scanlines[1];
 };
 
-static struct frame *frame_mk(int width, int height) {
-  struct frame *fr = calloc(1, sizeof (struct frame) + (sizeof (struct scanline) * (height - 1)));
+static struct dali_frame *frame_mk(int width, int height) {
+  struct dali_frame *fr = calloc(1, sizeof (struct dali_frame) + (sizeof (struct scanline) * (height - 1)));
   int x, y;
   
   if (!fr) {
@@ -61,10 +64,9 @@ static struct frame *frame_mk(int width, int height) {
   return fr;
 }
 
-static struct frame *frame_from_pixmap(const unsigned char *bits, int width, int height)
-{
+static struct dali_frame *frame_from_pixmap(const unsigned char *bits, int width, int height) {
   int x, y;
-  struct frame *frame;
+  struct dali_frame *frame;
   POS *left, *right;
 
   frame = frame_mk(width, height);
@@ -121,15 +123,14 @@ static struct frame *frame_from_pixmap(const unsigned char *bits, int width, int
   return frame;
 }
 
-static void frame_copy(struct frame *from, struct frame *to) {
+static void frame_copy(struct dali_frame *from, struct dali_frame *to) {
   int y;
 
   for (y = 0; y < char_height; y++)
     to->scanlines[y] = from->scanlines[y];  /* copies the whole struct */
 }
 
-static void numbers_init()
-{
+static void numbers_init() {
   unsigned int i;
   /* We've pre-chosen the font needed to make this fit. */
   const struct raw_number *raw = get_raw_numbers();
@@ -149,8 +150,7 @@ static void numbers_init()
 }
 
 
-static void numbers_free()
-{
+static void numbers_free() {
   unsigned int i;
 # define FREEIF(x) do { if ((x)) { free((x)); (x) = 0; } } while (0)
 # define FREELOOP(x) do { \
@@ -164,8 +164,27 @@ static void numbers_free()
 # undef FREEIF
 }
 
-static void draw_horizontal_line(GContext *ctx, int x1, int x2, int y, int screen_width, bool black_p)
-{
+static void frame_lerp(int from, int to, int tm /* 0 to 65535. */) {
+  int y, x;
+  struct dali_frame *fromf, *tof;
+  
+  fromf = from >= 0 ? base_frames[from] : clear_frame;
+  tof   = to   >= 0 ? base_frames[to]   : clear_frame;
+  
+#define LERP(a, b) (((a) * (65536 - tm) + (b) * (tm + 1)) / 65536)
+  for (y = 0; y < char_height; y++)
+    for (x = 0; x < MAX_SEGS_PER_LINE; x++) {
+      temp_frame->scanlines[y].left [x] = LERP(fromf->scanlines[y].left [x], tof->scanlines[y].left [x]);
+      temp_frame->scanlines[y].right[x] = LERP(fromf->scanlines[y].right[x], tof->scanlines[y].right[x]);
+    }
+#undef LERP
+}
+
+
+/**************************************************************************/
+/* PebbleOS drawing routines. */
+
+static void draw_horizontal_line(GContext *ctx, int x1, int x2, int y, int screen_width, bool black_p) {
   if (x1 > screen_width) x1 = screen_width;
   else if (x1 < 0) x1 = 0;
 
@@ -185,9 +204,9 @@ static void draw_horizontal_line(GContext *ctx, int x1, int x2, int y, int scree
   graphics_draw_line(ctx, (GPoint) { .x = x1, .y = y }, (GPoint) { .x = x2, .y = y });
 }
 
-static void frame_render(struct frame *frame, GContext *ctx, GPoint ofs) {
+static void frame_render(struct dali_frame *frame, GContext *ctx, GPoint ofs) {
   int px, py;
-  GRect bbox = layer_get_bounds(window_get_root_layer(window));
+  GRect bbox = layer_get_bounds(window_get_root_layer(mainwin));
 
   for (py = 0; py < char_height; py++)
     {
@@ -231,23 +250,9 @@ static void frame_render(struct frame *frame, GContext *ctx, GPoint ofs) {
     }
 }
 
-static void frame_lerp(int from, int to) {
-  int y, x;
-  struct frame *fromf, *tof;
-  
-  fromf = from >= 0 ? base_frames[from] : clear_frame;
-  tof   = to   >= 0 ? base_frames[to]   : clear_frame;
-  
-#define LERP(a, b) (((a) * (65536 - animtime) + (b) * (animtime + 1)) / 65536)
-  for (y = 0; y < char_height; y++)
-    for (x = 0; x < MAX_SEGS_PER_LINE; x++) {
-      temp_frame->scanlines[y].left [x] = LERP(fromf->scanlines[y].left [x], tof->scanlines[y].left [x]);
-      temp_frame->scanlines[y].right[x] = LERP(fromf->scanlines[y].right[x], tof->scanlines[y].right[x]);
-    }
-}
 
 /**************************************************************************/
-/* PebbleOS shim. */
+/* PebbleOS main loop. */
 
 /* Just so we all have this straight, I have:
  *   a window load handler, that schedules
@@ -263,6 +268,7 @@ static void frame_lerp(int from, int to) {
 static Animation *transition_anim;
 static struct tm curtm, lasttm; /* Delay by one, so we tick over from 59 to 00. */
 int needs_animate = 1;
+static uint32_t animtime;
 
 static void update_layer(struct Layer *layer, GContext *ctx) {
   char s[64];
@@ -291,15 +297,15 @@ static void update_layer(struct Layer *layer, GContext *ctx) {
   int x;
   
   x = 0;
-  frame_lerp(current_digits[4] == -1 ? -1 : 10, 10);
+  frame_lerp(current_digits[4] == -1 ? -1 : 10, 10, animtime);
   frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = 0 });
   x += colon_width;
   
-  frame_lerp(current_digits[4], target_digits[4]);
+  frame_lerp(current_digits[4], target_digits[4], animtime);
   frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = 0 });
   x += char_width;
   
-  frame_lerp(current_digits[5], target_digits[5]);
+  frame_lerp(current_digits[5], target_digits[5], animtime);
   frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = 0 });
 
 #elif defined(STYLE_HOURSMINUTES)
@@ -307,21 +313,21 @@ static void update_layer(struct Layer *layer, GContext *ctx) {
   
   /* Hours... */
   x = (bbox.size.w - char_width * 2) / 2;
-  frame_lerp(current_digits[0], target_digits[0]);
+  frame_lerp(current_digits[0], target_digits[0], animtime);
   frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = 0 });
   x += char_width;
   
-  frame_lerp(current_digits[1], target_digits[1]);
+  frame_lerp(current_digits[1], target_digits[1], animtime);
   frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = 0 });
   x += char_width;
   
   /* Minutes ... */
   x = (bbox.size.w - char_width * 2) / 2;
-  frame_lerp(current_digits[2], target_digits[2]);
+  frame_lerp(current_digits[2], target_digits[2], animtime);
   frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = char_height + 8 });
   x += char_width;
   
-  frame_lerp(current_digits[3], target_digits[3]);
+  frame_lerp(current_digits[3], target_digits[3], animtime);
   frame_render(temp_frame, ctx, (GPoint) { .x = x, .y = char_height + 8 });
   x += char_width;
   
@@ -336,11 +342,9 @@ static void update_layer(struct Layer *layer, GContext *ctx) {
                      NULL
                      );
 
-
   snprintf(s, sizeof(s),
            "%02d:%02d:%02d",
            lasttm.tm_hour, lasttm.tm_min, lasttm.tm_sec);
-           
   graphics_draw_text(ctx, s, 
                      fonts_get_system_font(FONT_KEY_GOTHIC_14),
                      (GRect) { .origin = { 0, bbox.size.h - 14 }, .size = { bbox.size.w, 28 } },
@@ -348,15 +352,13 @@ static void update_layer(struct Layer *layer, GContext *ctx) {
                      GTextAlignmentCenter,
                      NULL
                      );
-  
-  
 #endif
 
 }
 
 static void handle_anim(Animation *anim, const uint32_t _animtime /* between 0 and 65536 */) {
   animtime = _animtime;
-  layer_mark_dirty(window_get_root_layer(window));
+  layer_mark_dirty(window_get_root_layer(mainwin));
 }
 
 static AnimationImplementation anim_impl = {
@@ -386,14 +388,14 @@ static void handle_tick(struct tm *tm, TimeUnits units_changed) {
     animation_schedule(transition_anim);
     needs_animate = 0;
   } else
-    layer_mark_dirty(window_get_root_layer(window));
+    layer_mark_dirty(window_get_root_layer(mainwin));
 #else
   animation_schedule(transition_anim);
 #endif
 }
 
-static void window_load(Window *window) {
-  Layer *window_layer = window_get_root_layer(window);
+static void window_load(Window *mainwin) {
+  Layer *window_layer = window_get_root_layer(mainwin);
   time_t tt;
   struct tm *tm;
   
@@ -413,32 +415,32 @@ static void window_load(Window *window) {
   animtime = 0;
 }
 
-static void window_unload(Window *window) {
+static void window_unload(Window *mainwin) {
   animation_destroy(transition_anim);
   tick_timer_service_unsubscribe();
 }
 
 static void init(void) {
-  window = window_create();
-  window_set_window_handlers(window, (WindowHandlers) {
+  mainwin = window_create();
+  window_set_window_handlers(mainwin, (WindowHandlers) {
     .load = window_load,
     .unload = window_unload,
   });
   const bool animated = true;
-  window_stack_push(window, animated);
+  window_stack_push(mainwin, animated);
   
   numbers_init();
 }
 
 static void deinit(void) {
   numbers_free();
-  window_destroy(window);
+  window_destroy(mainwin);
 }
 
 int main(void) {
   init();
 
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Done initializing, pushed window: %p", window);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Dali Clock for Pebble initialized");
   
   app_event_loop();
   deinit();
