@@ -128,41 +128,11 @@ static void frame_copy(struct frame *from, struct frame *to) {
     to->scanlines[y] = from->scanlines[y];  /* copies the whole struct */
 }
 
-/* Returns the largest font that will fit on the screen.
- */
-static const struct raw_number *
-pick_font()
-{
-  int nn, cc;
-  const struct raw_number *num;
-
-//  if (state->seconds_only_p)
-    nn = 2, cc = 0;
-//  else
-//
-//    nn = 6, cc = 2;
-  
-  GRect bbox = layer_get_bounds(window_get_root_layer(window));
-
-# define CHECK(WHICH) \
-    num = get_raw_number_##WHICH (); \
-    if (bbox.size.w >= ((num[0].width * nn) + (num[10].width * cc)) && \
-        bbox.size.h >= num[0].height) \
-      return num
-//  CHECK(3);
-  CHECK(2);
-//  CHECK(1);
-//  CHECK(0);
-# undef CHECK
-  APP_LOG(APP_LOG_LEVEL_ERROR, "Display too small for all fonts!");
-  _abort();
-  return 0;
-}
-
 static void numbers_init()
 {
   unsigned int i;
-  const struct raw_number *raw = pick_font();
+  /* We've pre-chosen the font needed to make this fit. */
+  const struct raw_number *raw = get_raw_numbers();
 
   char_width  = raw[0].width;
   char_height = raw[0].height;

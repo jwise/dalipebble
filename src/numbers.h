@@ -37,9 +37,6 @@ struct raw_number {
   { 0, }								\
 }
 
-const struct raw_number *get_raw_number_0 (void);
-const struct raw_number *get_raw_number_1 (void);
-const struct raw_number *get_raw_number_2 (void);
-const struct raw_number *get_raw_number_3 (void);
+const struct raw_number *get_raw_numbers (void);
 
 #endif /* __NUMBERS_H__ */

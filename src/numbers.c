@@ -16,50 +16,6 @@
 
 #include "numbers.h"
 
-# include "font/zeroF.xbm"
-# include "font/oneF.xbm"
-# include "font/twoF.xbm"
-# include "font/threeF.xbm"
-# include "font/fourF.xbm"
-# include "font/fiveF.xbm"
-# include "font/sixF.xbm"
-# include "font/sevenF.xbm"
-# include "font/eightF.xbm"
-# include "font/nineF.xbm"
-# include "font/colonF.xbm"
-# include "font/slashF.xbm"
-FONT(F);
-
-# include "font/zeroD2.xbm"
-# include "font/oneD2.xbm"
-# include "font/twoD2.xbm"
-# include "font/threeD2.xbm"
-# include "font/fourD2.xbm"
-# include "font/fiveD2.xbm"
-# include "font/sixD2.xbm"
-# include "font/sevenD2.xbm"
-# include "font/eightD2.xbm"
-# include "font/nineD2.xbm"
-# include "font/colonD2.xbm"
-# include "font/slashD2.xbm"
-FONT(D2);
-
-#if 0
-# include "font/zeroD.xbm"
-# include "font/oneD.xbm"
-# include "font/twoD.xbm"
-# include "font/threeD.xbm"
-# include "font/fourD.xbm"
-# include "font/fiveD.xbm"
-# include "font/sixD.xbm"
-# include "font/sevenD.xbm"
-# include "font/eightD.xbm"
-# include "font/nineD.xbm"
-# include "font/colonD.xbm"
-# include "font/slashD.xbm"
-FONT(D);
-#endif
-
 # include "font/zeroE.xbm"
 # include "font/oneE.xbm"
 # include "font/twoE.xbm"
@@ -74,11 +30,4 @@ FONT(D);
 # include "font/slashE.xbm"
 FONT(E);
 
-const struct raw_number *get_raw_number_0 (void) { return numbers_F;  }
-const struct raw_number *get_raw_number_1 (void) { return numbers_D2; }
-const struct raw_number *get_raw_number_2 (void) { return numbers_E;  }
-const struct raw_number *get_raw_number_3 (void) { return numbers_D2; }
-
-/* I'd like to use numbers_D (128) for get_raw_number_3, but it makes the
-   data segment too large "Signed .word overflow; switch may be too large")
- */
+const struct raw_number *get_raw_numbers (void) { return numbers_E; }
