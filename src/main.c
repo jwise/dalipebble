@@ -266,8 +266,8 @@ static void frame_render(struct dali_frame *frame, GContext *ctx, GPoint ofs) {
  */
 
 static Animation *transition_anim;
-static struct tm curtm, lasttm; /* Delay by one, so we tick over from 59 to 00. */
-int needs_animate = 1;
+static struct tm curtm; /* Make sure that the seconds counter is in sync with the Dali-ing. */
+static int needs_animate = 1;
 static uint32_t animtime;
 
 static void update_layer(struct Layer *layer, GContext *ctx) {
@@ -333,7 +333,7 @@ static void update_layer(struct Layer *layer, GContext *ctx) {
   
   snprintf(s, sizeof(s),
            "%04d-%02d-%02d",
-           lasttm.tm_year + 1900, lasttm.tm_mon + 1, lasttm.tm_mday);
+           curtm.tm_year + 1900, curtm.tm_mon + 1, curtm.tm_mday);
   graphics_draw_text(ctx, s, 
                      fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
                      (GRect) { .origin = { 0, bbox.size.h - 18 - 1 - 14 }, .size = { bbox.size.w, 28 } },
@@ -344,7 +344,7 @@ static void update_layer(struct Layer *layer, GContext *ctx) {
 
   snprintf(s, sizeof(s),
            "%02d:%02d:%02d",
-           lasttm.tm_hour, lasttm.tm_min, lasttm.tm_sec);
+           curtm.tm_hour, curtm.tm_min, curtm.tm_sec);
   graphics_draw_text(ctx, s, 
                      fonts_get_system_font(FONT_KEY_GOTHIC_14),
                      (GRect) { .origin = { 0, bbox.size.h - 14 }, .size = { bbox.size.w, 28 } },
@@ -367,11 +367,34 @@ static AnimationImplementation anim_impl = {
   .teardown = NULL,
 };
 
-static void handle_tick(struct tm *tm, TimeUnits units_changed) {
+static void handle_tick(struct tm *_tm, TimeUnits units_changed) {
   int i;
+  struct tm *tm;
+  time_t tt;
+  
+  /* Hah!  Pebble's mktime() is actually totally busted (if you invoke it,
+   * it crashes in the midst of 'validate_structure()', when it is doing
+   * some manipulations on tm_mon ...  even if the tm_mon you pass in is
+   * totally legitimate).  So if we want to look one second into the future
+   * to see when to animate, we have to get our own time_t, rather than
+   * rebuilding one from the tm that was passed in.
+   *
+   * While I'm complaining -- is there some good reason that I'm not seeing
+   * for why the POSIX time API is the way it is?  Why are pointers being
+   * thrown around willy-nilly?
+   */
+  
+  time(&tt);
+  tm = localtime(&tt);
   
   for (i = 0; i < 6; i++)
     current_digits[i] = target_digits[i];
+
+  memcpy(&curtm, tm, sizeof(*tm));
+  
+  /* To see what we're animating *to*, we look a second into the future. */
+  tt++;
+  tm = localtime(&tt);
 
   target_digits[0] = tm->tm_hour / 10;
   target_digits[1] = tm->tm_hour % 10;
@@ -379,9 +402,6 @@ static void handle_tick(struct tm *tm, TimeUnits units_changed) {
   target_digits[3] = tm->tm_min % 10;
   target_digits[4] = tm->tm_sec / 10;
   target_digits[5] = tm->tm_sec % 10;
-  
-  memcpy(&lasttm, &curtm, sizeof(*tm));
-  memcpy(&curtm, tm, sizeof(*tm));
   
 #ifdef STYLE_HOURSMINUTES
   if (tm->tm_sec == 0 || needs_animate) {
@@ -405,11 +425,10 @@ static void window_load(Window *mainwin) {
   transition_anim = animation_create();
   animation_set_duration(transition_anim, 1000);
   animation_set_implementation(transition_anim, &anim_impl);
-  needs_animate = 1;
+  needs_animate = 1; /* Make sure to kick one off next time. */
   
   time(&tt);
   tm = localtime(&tt);
-  memcpy(&lasttm, tm, sizeof(*tm));
   memcpy(&curtm, tm, sizeof(*tm));
   
   animtime = 0;
