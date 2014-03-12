@@ -342,9 +342,19 @@ static void update_layer(struct Layer *layer, GContext *ctx) {
                      NULL
                      );
 
-  snprintf(s, sizeof(s),
-           "%02d:%02d:%02d",
-           curtm.tm_hour, curtm.tm_min, curtm.tm_sec);
+  if (clock_is_24h_style()) {
+    snprintf(s, sizeof(s),
+             "%02d:%02d:%02d",
+             curtm.tm_hour, curtm.tm_min, curtm.tm_sec);
+  } else {
+    int h = curtm.tm_hour;
+    if (h > 12) h -= 12;
+    if (h == 0) h = 12;
+    snprintf(s, sizeof(s),
+             "%d:%02d:%02d %s",
+             h, curtm.tm_min, curtm.tm_sec,
+             curtm.tm_hour < 12 ? "AM" : "PM");
+  }
   graphics_draw_text(ctx, s, 
                      fonts_get_system_font(FONT_KEY_GOTHIC_14),
                      (GRect) { .origin = { 0, bbox.size.h - 14 }, .size = { bbox.size.w, 28 } },
@@ -395,9 +405,23 @@ static void handle_tick(struct tm *_tm, TimeUnits units_changed) {
   /* To see what we're animating *to*, we look a second into the future. */
   tt++;
   tm = localtime(&tt);
-
-  target_digits[0] = tm->tm_hour / 10;
-  target_digits[1] = tm->tm_hour % 10;
+  
+  if (clock_is_24h_style()) {
+    target_digits[0] = tm->tm_hour / 10;
+    target_digits[1] = tm->tm_hour % 10;
+  } else {
+    int h = tm->tm_hour;
+    if (h > 12) h -= 12;
+    if (h == 0) h = 12;
+    
+    /* Smoothly animating this left to right would be cooler, but people who
+     * use 12 hour time suck anyway.  */
+    target_digits[0] = h / 10;
+    if (target_digits[0] == 0) target_digits[0] = -1;
+    
+    target_digits[1] = h % 10;
+  }
+    
   target_digits[2] = tm->tm_min / 10;
   target_digits[3] = tm->tm_min % 10;
   target_digits[4] = tm->tm_sec / 10;
