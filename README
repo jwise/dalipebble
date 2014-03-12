@@ -20,12 +20,11 @@ purpose.  It is provided "as is" without express or implied warranty.
 
 This program is a very simple -- and ugly -- port of Dali Clock.  Very
 little care was taken to homogenize C style, and globals are strewn about
-Halloween candy.  Any distasteful style within should be considered to be
-the work of myself, and not of Jamie!
+like Halloween candy.  Any distasteful style within should be considered to
+be the work of myself, and not of Jamie!
 
 ===
 
 To do:
-  * add support for 12-hour mode when rendering hours
-  * determine if it is actually my Pebble at fault, or if something in the
-    app is causing the watch to sometimes reboot
+  * Add more graceful 12-hour support.
+  * Add support for showing seconds.  (Requires PebbleOS support.)

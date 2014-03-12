@@ -1,6 +1,25 @@
+/* Dali Clock - a melting digital clock for Pebble.
+ * Copyright (c) 2014 Joshua Wise <joshua@joshuawise.com>
+ * Copyright (c) 1991-2010 Jamie Zawinski <jwz@jwz.org>
+ *
+ * Permission to use, copy, modify, distribute, and sell this software and its
+ * documentation for any purpose is hereby granted without fee, provided that
+ * the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation.  No representations are made about the suitability of this
+ * software for any purpose.  It is provided "as is" without express or
+ * implied warranty.
+ */
+
 #include <pebble.h>
 
 #include "numbers.h"
+
+/* If you want to burn battery, STYLE_DEBUG Dalis the seconds across the
+ * screen.  STYLE_HOURSMINUTES is something you might actually want to use. 
+ * Once the OS allows watchfaces to grab the back button, it seems like the
+ * right thing is to add support for the back button to show seconds.
+ */
 
 // #define STYLE_DEBUG
 #define STYLE_HOURSMINUTES
@@ -31,10 +50,16 @@ static void _abort() {
 
 
 /**************************************************************************/
-/* Scanline parsing. */
+/* Scanline parsing. 
+ *
+ * (Largely stolen from the PalmOS original).
+ */
 
 /* Internally, the application converts the bitmaps to lists of scanlines;
- * each scanline has segments that we then lerp between.  */
+ * each scanline has segments that we then lerp between.  If we wanted to
+ * save RAM, it would probably be a good idea to pre-parse into scanlines at
+ * compile time, so we don't have to have both the parsed version and the
+ * pixmap version resident in RAM.  */
 #define MAX_SEGS_PER_LINE 3
 
 #undef countof

@@ -4,7 +4,7 @@
   "longName": "Dali Clock",
   "companyName": "Joshua Wise",
   "versionCode": 1,
-  "versionLabel": "0.1.0",
+  "versionLabel": "0.2",
   "watchapp": {
     "watchface": true
   },
