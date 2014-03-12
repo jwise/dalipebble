@@ -1,7 +1,7 @@
 {
   "uuid": "374c5105-af36-420d-942c-9a58ff98576c",
-  "shortName": "xdaliclock",
-  "longName": "xdaliclock",
+  "shortName": "Dali Clock",
+  "longName": "Dali Clock",
   "companyName": "Joshua Wise",
   "versionCode": 1,
   "versionLabel": "0.1.0",
@@ -11,6 +11,13 @@
   "appKeys": {
   },
   "resources": {
-    "media": []
+    "media": [
+      {
+        "type": "png",
+        "name": "MENU",
+        "file": "images/menu.png",
+        "menuIcon": true
+      }
+    ]
   }
 }
