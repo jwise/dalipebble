@@ -28,3 +28,5 @@ be the work of myself, and not of Jamie!
 To do:
   * Add more graceful 12-hour support.
   * Add support for showing seconds.  (Requires PebbleOS support.)
+  * Would be nice: "warning icons" on screen for battery low and for
+    Bluetooth connection lost.
